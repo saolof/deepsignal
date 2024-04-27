@@ -1,3 +1,4 @@
+//@ts-check
 import { computed, signal, Signal } from "@preact/signals-core";
 
 const proxyToSignals = new WeakMap();
@@ -9,20 +10,30 @@ const rg = /^\$/;
 const descriptor = Object.getOwnPropertyDescriptor;
 let peeking = false;
 
-export const deepSignal = <T extends object>(obj: T): DeepSignal<T> => {
+
+/**
+ * Takes any object and makes it deep-reactive
+ * @template T
+ * @param {T & object} obj
+ * @returns {DeepSignal<T>}
+ */
+export const deepSignal = (obj) => {
 	if (!shouldProxy(obj)) throw new Error("This object can't be observed.");
 	if (!objToProxy.has(obj))
 		objToProxy.set(obj, createProxy(obj, objectHandlers) as DeepSignal<T>);
 	return objToProxy.get(obj);
 };
 
-export const peek = <
-	T extends DeepSignalObject<object>,
-	K extends keyof RevertDeepSignalObject<T>
->(
-	obj: T,
-	key: K
-): RevertDeepSignal<RevertDeepSignalObject<T>[K]> => {
+
+/**
+ * Takes any object and makes it deep-reactive
+ * @template T   //ext DeepSignalObject<object>
+ * @template K  //ext 
+ * @param {T & {DeepSignalObject<object>}} obj
+ * @param {K & {keyof RevertDeepSignalObject<T>}} key
+ * @returns {RevertDeepSignal<RevertDeepSignalObject<T>[K]>}
+ */
+export const peek = (obj, key) => {
 	peeking = true;
 	const value = obj[key];
 	try {
@@ -32,12 +43,25 @@ export const peek = <
 };
 
 const isShallow = Symbol("shallow");
-export function shallow<T extends object>(obj: T): Shallow<T> {
+
+/**
+ * Makes deep reactivity ignore obj
+ * @template T   //ext DeepSignalObject<object>
+ * @param {T & object} obj
+ * @returns {Shallow<T>}
+ */
+export function shallow(obj) {
 	ignore.add(obj);
 	return obj as Shallow<T>;
 }
 
-const createProxy = (target: object, handlers: ProxyHandler<object>) => {
+/**
+ * Creates a proxy to target
+ * @param {object} target
+ * @param {object} ProxyHandler<object>
+ * @returns {Proxy}
+ */
+const createProxy = (target, handlers) => {
 	const proxy = new Proxy(target, handlers);
 	ignore.add(proxy);
 	return proxy;
@@ -47,9 +71,14 @@ const throwOnMutation = () => {
 	throw new Error("Don't mutate the signals directly.");
 };
 
-const get =
-	(isArrayOfSignals: boolean) =>
-	(target: object, fullKey: string, receiver: object): unknown => {
+
+
+/**
+ * Creates getter
+ * @param {boolean} isArrayOfSignals
+ * @returns {function(object,string,object): unknown}
+ */
+const get = (isArrayOfSignals) => (target, fullKey, receiver) => {
 		if (peeking) return Reflect.get(target, fullKey, receiver);
 		let returnSignal = isArrayOfSignals || fullKey[0] === "$";
 		if (!isArrayOfSignals && returnSignal && Array.isArray(target)) {
@@ -87,6 +116,8 @@ const get =
 		return returnSignal ? signals.get(key) : signals.get(key).value;
 	};
 
+
+// TODO
 const objectHandlers = {
 	get: get(false),
 	set(target: object, fullKey: string, val: any, receiver: object): boolean {
